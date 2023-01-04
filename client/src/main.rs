@@ -9,6 +9,9 @@ use store::{EndGameReason, GameEvent, GameState};
 // This id needs to be the same that the server is using
 const PROTOCOL_ID: u64 = 1208;
 
+#[derive(Component)]
+struct Tile;
+
 fn main() {
     // Get username from stdin args
     let args = std::env::args().collect::<Vec<String>>();
@@ -181,6 +184,7 @@ fn update_board(
     game_state: Res<GameState>,
     mut game_events: EventReader<GameEvent>,
     asset_server: Res<AssetServer>,
+    query: Query<(Entity, &Transform), With<Tile>>,
 ) {
     for event in game_events.iter() {
         match event {
@@ -194,19 +198,34 @@ fn update_board(
                         store::Tile::Empty => "dot.png", // This should never happen
                     });
 
-                commands.spawn_bundle(SpriteBundle {
-                    transform: Transform::from_xyz(
-                        160.0 * (x as f32 - 1.0),
-                        -30.0 + 160.0 * (y as f32 - 1.0),
-                        0.0,
-                    ),
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(160.0, 160.0)),
+                commands
+                    .spawn_bundle(SpriteBundle {
+                        transform: Transform::from_xyz(
+                            160.0 * (x as f32 - 1.0),
+                            -30.0 + 160.0 * (y as f32 - 1.0),
+                            0.0,
+                        ),
+                        sprite: Sprite {
+                            custom_size: Some(Vec2::new(160.0, 160.0)),
+                            ..default()
+                        },
+                        texture,
                         ..default()
-                    },
-                    texture: texture.into(),
-                    ..default()
-                });
+                    })
+                    .insert(Tile);
+            }
+            GameEvent::RemoveTile { player_id, at } => {
+                for (entity, transform) in query.iter() {
+                    if transform.translation
+                        == (Vec3 {
+                            x: 160.0 * ((at % 3) as f32 - 1.0),
+                            y: -30.0 + 160.0 * ((at / 3) as f32 - 1.0),
+                            z: 0.0,
+                        })
+                    {
+                        commands.entity(entity).despawn();
+                    }
+                }
             }
             _ => {}
         }

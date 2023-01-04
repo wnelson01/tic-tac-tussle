@@ -116,6 +116,17 @@ fn main() {
                         trace!("Player {} sent:\n\t{:#?}", client_id, event);
                         server.broadcast_message(0, bincode::serialize(&event).unwrap());
 
+                        for (player_id, player) in game_state.players.clone().iter() {
+                            if player.history.len() > 3 {
+                                let event = store::GameEvent::RemoveTile {
+                                    player_id: *player_id,
+                                    at: *player.history.front().unwrap(),
+                                };
+                                game_state.consume(&event);
+                                server.broadcast_message(0, bincode::serialize(&event).unwrap());
+                            }
+                        }
+
                         // Determine if a player has won the game
                         if let Some(winner) = game_state.determine_winner() {
                             let event = store::GameEvent::EndGame {

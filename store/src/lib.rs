@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// Struct for storing player related data.
 /// In tic-tac-toe the only thing we need is the name and the piece the player will be placing
@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub struct Player {
     pub name: String,
     pub piece: Tile,
+    pub history: VecDeque<usize>,
 }
 
 /// Possible GameStates for a tile in the board
@@ -77,11 +78,12 @@ pub enum GameEvent {
     PlayerJoined { player_id: PlayerId, name: String },
     PlayerDisconnected { player_id: PlayerId },
     PlaceTile { player_id: PlayerId, at: usize },
+    RemoveTile { player_id: PlayerId, at: usize },
 }
 
 impl GameState {
     /// Determines whether an event is valid considering the current GameState
-    pub fn validate(&self, event: &GameEvent) -> bool {
+    pub fn validate(&mut self, event: &GameEvent) -> bool {
         use GameEvent::*;
         match event {
             BeginGame { goes_first } => {
@@ -120,10 +122,12 @@ impl GameState {
                 if *at > 8 {
                     return false;
                 }
+
                 if self.board[*at] != Tile::Empty {
                     return false;
                 }
             }
+            RemoveTile { player_id, at } => return true,
         }
 
         true
@@ -150,6 +154,7 @@ impl GameState {
                         } else {
                             Tile::Tic
                         },
+                        history: VecDeque::new(),
                     },
                 );
             }
@@ -158,6 +163,8 @@ impl GameState {
             }
             PlaceTile { player_id, at } => {
                 let piece = self.get_player_tile(player_id).unwrap();
+                let player = self.players.get_mut(player_id).unwrap();
+                player.history.push_back(*at);
                 self.board[*at] = piece;
                 self.active_player_id = self
                     .players
@@ -165,6 +172,11 @@ impl GameState {
                     .find(|id| *id != player_id)
                     .unwrap()
                     .clone();
+            }
+            RemoveTile { player_id, at } => {
+                let player = self.players.get_mut(player_id).unwrap();
+                player.history.pop_front();
+                self.board[*at] = Tile::Empty;
             }
         }
 
